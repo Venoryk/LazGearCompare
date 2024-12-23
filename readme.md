@@ -39,7 +39,7 @@ A desktop application for comparing EverQuest gear stats with a clean, modern in
 ## Installation
 
 ### Option 1: Download the Release
-1. Download the latest release from the [Releases](link-to-your-releases) page
+1. Download the latest release from the [Releases](https://github.com/Venoryk/LazGearCompare/releases) page
 2. Note: Some antivirus software may flag the executable as suspicious. This is a known false positive that has been reported. See [Antivirus False Positive Notice](#antivirus-false-positive-notice) below.
 
 ### Option 2: Build from Source
