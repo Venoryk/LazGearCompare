@@ -82,6 +82,12 @@ If you prefer to build from source or encounter antivirus warnings, follow these
 
     The executable will be created in the dist folder.
 
+6. When finished, deactivate the virtual environment
+
+    ```bash
+    deactivate
+    ```
+
 ## Requirements
 - Python 3.8 or higher
 - Required packages (automatically installed with requirements.txt):
