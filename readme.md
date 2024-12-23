@@ -25,16 +25,16 @@ A desktop application for comparing EverQuest gear stats with a clean, modern in
 ## Screenshots
 
 ### Main Window
-![Main Window Variations](screenshots/main_window.png)
+<img src="screenshots/main_window.png" height="600" alt="Main Window Variations">
 *Showing all variations - Top row: Light and Dark Mode | Bottom row: Light and Dark Mode with Stats Colorization*
 
 ### CSV Viewer
-![CSV Viewer](screenshots/csv_viewer.png)
-*CSV Viewer showing color-coded categories and tooltip functionality*
+<img src="screenshots/csv_viewer.png" width="800" alt="CSV Viewer">
+*Top row: Light and Dark Mode with tooltips | Bottom row: Light and Dark Mode with color-coded categories and tooltips*
 
 ### Options Menu
 ![Options Menu](screenshots/options_menu.png)
-*Customizable settings for application behavior*
+*Options menu in Light and Dark Mode*
 
 ## Installation
 
