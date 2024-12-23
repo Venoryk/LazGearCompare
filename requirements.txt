@@ -1,0 +1,11 @@
+customtkinter>=5.2.1      # Custom themed tkinter widgets
+CTkMessagebox>=2.5        # Custom themed message boxes
+pillow>=10.1.0           # Image handling for UI
+pandas>=2.1.4            # CSV data handling and manipulation
+json>=3.11.0            # JSON handling for cache files
+argparse>=1.4.0         # Command line argument parsing
+requests>=2.31.0         # HTTP requests
+urllib3>=2.0.7          # HTTP client
+beautifulsoup4>=4.12.2  # HTML parsing
+lxml>=4.9.3             # XML/HTML parser (faster than html.parser)
+pyinstaller>=6.0.0      # Creates standalone executables

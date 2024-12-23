@@ -1,0 +1,449 @@
+# utils/csv_viewer.py
+import pandas as pd
+import logging
+import webbrowser
+import ast
+import customtkinter as ctk
+
+from config.settings import DARK_MODE_COLORS, LIGHT_MODE_COLORS, DARK_CSV_CATEGORY_COLORS, LIGHT_CSV_CATEGORY_COLORS
+from config.constraints import STAT_CATEGORIES
+from utils.decorators import debug_log
+from ui.tooltip import ToolTip
+from ui.CTkXYFrame.CTkXYFrame import CTkXYFrame
+
+class CSVViewer:
+    """Class for handling CSV viewing functionality"""
+    
+    @debug_log
+    def __init__(self):
+        self.stat_categories = STAT_CATEGORIES
+        self.category_headers = []
+        self.column_headers = []
+        self.slot_headers = []
+        self.data_rows = []
+        self.tooltips = {}
+        self.viewer = None
+        self.df = None
+        self.colorize = False
+        logging.debug("Initializing CSV viewer")
+
+    @debug_log
+    def set_colorize(self, value):
+        """Set the colorize state"""
+        self.colorize = value
+        logging.debug(f"CSV colorize set to: {value}")
+
+    @debug_log
+    def load_csv(self, class_name):
+        try:
+            filename = f"{class_name.lower()}_gear_comparison.csv"
+            # Only load columns we need
+            needed_cols = ['Slot']  # Add Slot column
+            for category in self.stat_categories.values():
+                needed_cols.extend(category)
+                
+            # Add bard skill columns explicitly
+            if class_name.lower() == 'bard':
+                for skill in self.stat_categories['bard_skill']:
+                    needed_cols.append(f"BARD_{skill}")
+            
+            df = pd.read_csv(filename, 
+                            usecols=lambda x: x in needed_cols or 
+                                            x.endswith('_DETAILS') or 
+                                            x.startswith('BARD_'),
+                            na_filter=False,
+                            memory_map=True,
+                            low_memory=False,
+                            engine='c')
+            
+            logging.debug(f"Successfully loaded CSV for {class_name}")
+            logging.debug(f"Loaded columns: {df.columns.tolist()}")
+            return df
+        except Exception as e:
+            logging.error(f"Failed to load CSV: {e}")
+            return None
+
+    @debug_log
+    def format_header_text(self, text):
+        """Format header text to split double words"""
+        if text.lower() == 'bard_skill':  # Handle both cases
+            return 'INSTRUMENT\nMODIFIERS'
+        elif text.startswith('BARD_'):
+            # Handle bard skill headers from CSV
+            skill_name = text.replace('BARD_', '')
+            # Just get the first word (BRASS, STRINGS, etc)
+            skill_name = skill_name.split(' ')[0]
+            return skill_name
+        elif '_' in text:
+            words = text.split('_')
+            return '\n'.join(words)
+        elif ' ' in text:
+            words = text.split(' ')
+            return '\n'.join(words)
+        elif text == 'ENDURANCE':
+            return 'END'
+        return text
+
+    @debug_log
+    def format_effect_text(self, text):
+        """Format effect text to split on parentheses"""
+        if '(' in text and ')' in text:
+            main_text, paren_text = text.split('(', 1)
+            return f"{main_text.strip()}\n({paren_text}"
+        return text
+
+    @debug_log
+    def display_csv_data(self, viewer, df, dark_mode=False, colorize=False):
+        """Display CSV data in the viewer window"""
+        # Use passed colorize value or fall back to stored state
+        colorize = self.colorize if colorize is None else colorize
+        logging.debug(f"Displaying CSV with colorize={colorize}")
+
+        viewer.update_idletasks()
+        if df is None:
+            logging.error("No dataframe provided to display_csv_data")
+            return
+        
+        # Store references
+        self.viewer = viewer
+        self.df = df 
+
+        # Debug the DataFrame loading
+        logging.debug("DataFrame initial state:")
+        logging.debug(f"Columns in CSV: {list(df.columns)}")
+        logging.debug(f"Data types: {df.dtypes}")
+
+        try:
+            # Clear existing widgets
+            for widget in viewer.winfo_children():
+                widget.destroy()
+
+            # Set appearance mode before creating widgets
+            ctk.set_appearance_mode("Dark" if dark_mode else "Light")
+            
+            colors = DARK_MODE_COLORS if dark_mode else LIGHT_MODE_COLORS
+
+            # Create main frame with correct colors
+            main_frame = ctk.CTkFrame(viewer, fg_color=colors['bg'])
+            main_frame.pack(fill='both', expand=True, padx=10, pady=10)
+
+            # Configure main frame grid
+            main_frame.grid_rowconfigure(0, weight=1)
+            main_frame.grid_columnconfigure(0, weight=1)
+
+            # Create XY scrollable frame
+            scroll_frame = CTkXYFrame(
+                main_frame,
+                fg_color=colors['bg'],
+                width=1280,  # Set initial width
+                height=800  # Set initial height
+            )
+            scroll_frame.pack(fill='both', expand=True)
+
+            # Initialize widget lists
+            self.category_headers = []
+            self.column_headers = []
+            self.slot_headers = []
+            self.data_rows = []
+            self.tooltips = {}
+
+            # Calculate total columns and store category positions
+            category_positions = {}
+            current_col = 1  # Start at 1 to leave room for slot column
+
+            # Add detailed DataFrame debugging
+            logging.debug("DataFrame Info:")
+            logging.debug(f"Columns: {df.columns.tolist()}")
+            logging.debug(f"Shape: {df.shape}")
+            for col in df.columns:
+                logging.debug(f"Column '{col}' type: {type(col)}")
+
+            for category_name, cols in self.stat_categories.items():
+                if category_name == 'bard_skill':
+                    # Special handling for bard skill columns
+                    cols_present = []
+                    bard_cols = [col for col in df.columns if col.startswith('BARD_')]
+                    
+                    for col in bard_cols:
+                        if 'UNKNOWN (50)' in col:
+                            cols_present.append('BARD_ALL INSTRUMENTS')
+                        else:
+                            cols_present.append(col)
+                            
+                    # Sort according to STAT_CATEGORIES order
+                    if cols_present:
+                        ordered_cols = []
+                        for stat_col in self.stat_categories['bard_skill']:
+                            full_col = f"BARD_{stat_col}"
+                            if full_col in cols_present:
+                                ordered_cols.append(full_col)
+                        cols_present = ordered_cols
+                elif category_name == 'effects':
+                    # Special handling for effects
+                    cols_present = []
+                    for col in cols:
+                        if col in df.columns:
+                            cols_present.append(col)
+                            # Also check for details column
+                            details_col = f"{col}_DETAILS"
+                            if details_col in df.columns:
+                                cols_present.append(details_col)
+                    
+                    # Sort to ensure base effect columns come before details
+                    cols_present.sort(key=lambda x: '_DETAILS' in x)
+                else:
+                    cols_present = [col for col in cols if col in df.columns]
+                
+                # Process the category if it has columns
+                if cols_present:
+                    category_positions[category_name] = {
+                        'start_col': current_col,
+                        'cols': cols_present
+                    }
+                    logging.debug(f"Processing category {category_name} with columns: {cols_present}")
+                
+                # Inside the category loop where headers are created
+                if cols_present:
+                    category_positions[category_name] = {
+                        'start_col': current_col,
+                        'cols': cols_present
+                    }
+                    logging.debug(f"Processing category {category_name} with columns: {cols_present}")
+                    
+                    # Get colors based on category and colorize setting
+                    if colorize:
+                        colors_set = DARK_CSV_CATEGORY_COLORS if dark_mode else LIGHT_CSV_CATEGORY_COLORS
+                        header_color = colors_set[category_name]['header']
+                        category_color = colors_set[category_name]['category']
+                        cell_color = colors_set[category_name]['cell']
+                    else:
+                        header_color = colors['csv_top_header_bg']
+                        category_color = colors['csv_category_bg']
+                        cell_color = colors['csv_item_bg']
+                    
+                    # Category header
+                    header_text = self.format_header_text(category_name.upper())
+                    category_header = ctk.CTkLabel(
+                        scroll_frame,
+                        text=header_text,
+                        font=('Arial', 12, 'bold'),
+                        fg_color=header_color,
+                        text_color=colors['fg'],
+                        padx=10,
+                        pady=0,
+                        corner_radius=0,
+                        width=0,
+                        anchor="center",
+                        justify="center"
+                    )
+                    category_header.grid(row=0,
+                                    column=current_col,
+                                    columnspan=len(cols_present),
+                                    sticky='nsew',
+                                    padx=1,
+                                    pady=1,
+                                    ipadx=4)
+                    self.category_headers.append(category_header)
+
+                    # Column headers
+                    for col_idx, col in enumerate(cols_present):
+                        col_text = self.format_header_text(col)
+                        col_header = ctk.CTkLabel(
+                            scroll_frame,
+                            text=col_text,
+                            font=('Arial', 10, 'bold'),
+                            fg_color=category_color,
+                            text_color=colors['fg'],
+                            padx=10,
+                            pady=0,
+                            corner_radius=0,
+                            width=0,
+                            anchor="center",
+                            justify="center" 
+                        )
+                        col_header.grid(row=1,
+                                    column=current_col + col_idx,
+                                    sticky='nsew',
+                                    padx=1,
+                                    pady=1,
+                                    ipadx=4)
+                        self.column_headers.append(col_header)
+                    
+                    current_col += len(cols_present)
+
+            # Process slot groups
+            current_row = 2  # Start after headers
+            slot_groups = df.groupby('Slot')
+
+            for slot_name, slot_group in slot_groups:
+                # Create slot label
+                slot_label = ctk.CTkLabel(
+                    scroll_frame,
+                    text=slot_name,
+                    font=('Arial', 10, 'bold'),
+                    fg_color=colors_set['slot']['cell'] if colorize else colors['csv_category_bg'],
+                    text_color=colors['fg'],
+                    padx=10
+                )
+                slot_label.grid(row=current_row, 
+                            column=0,
+                            rowspan=len(slot_group),
+                            sticky='nsew', 
+                            padx=1, pady=1)
+                self.slot_headers.append(slot_label)
+
+                # Display items in this slot group
+                for idx, (_, row) in enumerate(slot_group.iterrows()):
+                    # Process each category at the correct position
+                    for category_name, position_info in category_positions.items():
+                        start_col = position_info['start_col']
+                        cols_present = position_info['cols']
+
+                        # Get colors for this specific category
+                        if colorize:
+                            colors_set = DARK_CSV_CATEGORY_COLORS if dark_mode else LIGHT_CSV_CATEGORY_COLORS
+                            header_color = colors_set[category_name]['header']
+                            category_color = colors_set[category_name]['category']
+                            cell_color = colors_set[category_name]['cell']
+                        else:
+                            header_color = colors['csv_top_header_bg']
+                            category_color = colors['csv_category_bg']
+                            cell_color = colors['csv_item_bg']
+
+                        for col_idx, col in enumerate(cols_present):
+                            value = str(row[col])
+                            current_col = start_col + col_idx
+
+                            if col == 'URL':
+                                link = ctk.CTkButton(
+                                    scroll_frame,
+                                    text="LINK",
+                                    command=lambda url=value: webbrowser.open(url),
+                                    width=50,
+                                    height=24,
+                                    fg_color=colors['button_bg'],
+                                    text_color=colors['fg']
+                                )
+                                link.grid(row=current_row + idx, 
+                                        column=current_col, 
+                                        sticky='nsew', padx=1, pady=1)
+                                self.data_rows.append(link)
+                            elif 'EFFECT' in col and not col.endswith('_DETAILS'):
+                                try:
+                                    # Handle the base effect display
+                                    details_col = f"{col}_DETAILS"
+                                    if details_col in df.columns:
+                                        details_value = row[details_col]
+                                        if pd.isna(details_value) or details_value == '':
+                                            display_text = ' '
+                                        else:
+                                            try:
+                                                effect_dict = ast.literal_eval(details_value)
+                                                display_text = effect_dict.get('name', ' ')
+                                            except:
+                                                display_text = ' '
+                                                logging.error(f"Error parsing effect details: {details_value}")
+                                    else:
+                                        display_text = ' '
+                                        logging.debug(f"No details column found for {col}")
+
+                                    # Create cell for effect name
+                                    cell = ctk.CTkLabel(
+                                        scroll_frame,
+                                        text=display_text,
+                                        font=('Arial', 10),
+                                        fg_color=cell_color,
+                                        text_color=colors['fg'],
+                                        padx=2,
+                                        pady=0,
+                                        corner_radius=0,
+                                        width=0,
+                                        anchor="center",
+                                        justify="center"
+                                    )
+                                    cell.grid(row=current_row + idx, 
+                                            column=current_col, 
+                                            sticky='nsew', 
+                                            padx=1,
+                                            pady=1,
+                                            ipadx=4)
+                                    self.data_rows.append(cell)
+
+                                    # Add tooltip for effect details
+                                    if details_col in df.columns:
+                                        details_value = row[details_col]
+                                        if not pd.isna(details_value):
+                                            try:
+                                                effect_dict = ast.literal_eval(details_value)
+                                                effect_details = effect_dict.get('effects', [])
+                                                if effect_details:
+                                                    tooltip_text = '\n'.join(effect_details)
+                                                    ToolTip(cell, tooltip_text)
+                                            except Exception as e:
+                                                logging.error(f"Error creating effect tooltip: {e}")
+
+                                except Exception as e:
+                                    logging.error(f"Error creating effect cell: {e}")
+                            else:
+                                # Special handling for bard skills
+                                if col.startswith('BARD_'):
+                                    # Ensure % is displayed for bard skills
+                                    if not value.endswith('%') and value.strip():
+                                        value = f"{value}%"
+                                    
+                                    # Format column header for bard skills
+                                    col = self.format_header_text(col)
+                                else:
+                                    # Format numeric values to remove unnecessary decimals
+                                    try:
+                                        if '.' in value:
+                                            numeric_value = float(value)
+                                            if numeric_value.is_integer():
+                                                value = str(int(numeric_value))
+                                    except ValueError:
+                                        pass  # Not a numeric value, use original string
+
+                                # For regular cells (non-effect, non-URL)
+                                cell = ctk.CTkLabel(
+                                    scroll_frame,
+                                    text=value if value.strip() else ' ',
+                                    font=('Arial', 10),
+                                    fg_color=cell_color,
+                                    text_color=colors['fg'],
+                                    padx=2,
+                                    pady=0,
+                                    corner_radius=0,
+                                    width=0,
+                                    anchor="center",
+                                    justify="center" 
+                                )
+                                cell.grid(row=current_row + idx, 
+                                        column=current_col, 
+                                        sticky='nsew', 
+                                        padx=1,
+                                        pady=1,
+                                        ipadx=4)
+                                self.data_rows.append(cell)
+
+                current_row += len(slot_group)
+
+            # Configure grid weights
+            scroll_frame.grid_columnconfigure(0, weight=1)  # Slot column
+            for i in range(current_col):
+                scroll_frame.grid_columnconfigure(i, weight=1)
+                scroll_frame.grid_rowconfigure(i, weight=1)  # Add row configuration
+
+            # Configure the frames
+            main_frame.grid_rowconfigure(0, weight=1)
+            main_frame.grid_columnconfigure(0, weight=1)
+
+            scroll_frame.parent_frame.grid_rowconfigure(0, weight=1)
+            scroll_frame.parent_frame.grid_columnconfigure(0, weight=1)
+
+            # Set frame expansion
+            scroll_frame.pack(fill='both', expand=True)
+            main_frame.pack(fill='both', expand=True)
+
+        except Exception as e:
+            logging.error(f"Error displaying CSV data: {e}")
+            raise
