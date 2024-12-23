@@ -89,6 +89,7 @@ If you prefer to build from source or encounter antivirus warnings, follow these
     ```
 
 ## Requirements
+- Windows 10 or Windows 11 (required for executable release)
 - Python 3.8 or higher
 - Required packages (automatically installed with requirements.txt):
     - customtkinter>=5.2.1 - Modern UI framework
