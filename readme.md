@@ -25,7 +25,7 @@ A desktop application for comparing EverQuest gear stats with a clean, modern in
 ## Screenshots
 
 ### Main Window
-<img src="screenshots/main_window.png" height="600" alt="Main Window Variations">
+<img src="screenshots/main_window.png" height="800" alt="Main Window Variations">
 *Showing all variations - Top row: Light and Dark Mode | Bottom row: Light and Dark Mode with Stats Colorization*
 
 ### CSV Viewer
@@ -33,7 +33,7 @@ A desktop application for comparing EverQuest gear stats with a clean, modern in
 *Top row: Light and Dark Mode with tooltips | Bottom row: Light and Dark Mode with color-coded categories and tooltips*
 
 ### Options Menu
-![Options Menu](screenshots/options_menu.png)
+<img src="screenshots/options_menu.png" height="200" alt="Options Menu">
 *Options menu in Light and Dark Mode*
 
 ## Installation
@@ -158,7 +158,7 @@ Some antivirus software may flag LazGearCompare.exe as suspicious. This is a kno
 
 1. Reviewing the source code in this repository
 2. Building the executable yourself using PyInstaller
-3. Checking the [VirusTotal results](https://www.virustotal.com/gui/file/a4dfff3e27e6b70b98eb1859b8d0f51933f6ce81c0457799ad230be817579e2f)
+3. Checking the [VirusTotal results](https://www.virustotal.com/gui/file/774f4f6fc6252eadb2098b63e30167b7cf9d33f223bbf4ef70e5095636b3a5b1)
 
 ### Why does this happen?
 This false positive is triggered by standard Python packaging techniques and is common with PyInstaller-generated executables. The application has been submitted for analysis to antivirus vendors to resolve these false positives.
