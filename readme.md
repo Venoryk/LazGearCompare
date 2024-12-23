@@ -57,7 +57,7 @@ If you prefer to build from source or encounter antivirus warnings, follow these
     ```bash
     python -m venv venv
     # Windows
-    venv\Scripts\activate
+    .\venv\Scripts\activate
     # Linux/Mac
     source venv/bin/activate
     ```
